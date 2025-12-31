@@ -1,0 +1,7 @@
+name: puzzle
+despondencies:
+    - python
+    - numpy
+    - scipy
+    - typing_extensions
+    - ipykernel
