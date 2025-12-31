@@ -1,7 +1,9 @@
 name: puzzle
-despondencies:
+dependencies:
     - python
     - numpy
     - scipy
     - typing_extensions
     - ipykernel
+    - pandas
+    - matplotlib
