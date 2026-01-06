@@ -4,6 +4,7 @@ import random
 from typing_extensions import Literal
 
 import numpy as np
+import networkx as nx
 
 PIECE_TYPE = Literal['edge', 'middle', 'corner']
 SUB_AREA = Literal['top_left', 'top_right', 'bottom_left', 'bottom_right']
@@ -221,6 +222,33 @@ class Puzzle:
         self.solution_time += 2
         return piece_a
 
+    def sort_puzzle(
+        self
+    )->list[np.array, np.array, np.array]:
+        """
+        Method to simulated sorting all pieces
+        Returns arrays of sorted pieces
+        """
+        edge_pieces = np.array([])
+        middle_pieces =  np.array([])
+        corner_pieces = np.array([])
+
+        i = 0
+
+        while i < self.all_puzzle_pieces.size:
+            piece_a = self.pickup_random_piece(self)
+            if piece_a.piece_type == 'edge':
+                edge_pieces = np.append(edge_pieces, piece_a)
+            elif piece_a.piece_type == 'corner':
+                corner_pieces = np.append(corner_pieces, piece_a)
+            elif piece_a.piece_type == 'middle':
+                middle_pieces = np.append(middle_pieces, piece_a)
+            i += 1
+        
+        return [edge_pieces, middle_pieces, corner_pieces]
+
+
+
     def random_solve(
         self,
     ) -> float:
@@ -249,10 +277,18 @@ class Puzzle:
         #all but one piece is left. Connect and finish puzzle
         return self.solution_time
         
+    def solve_edges(
+        self,
+        edge_pieces: np.ndarray[EdgePiece],
+        corner_pieces: np.ndarray[CornerPiece]
+    ):
+        return 0
 
     def edge_in_solve(
         self,
     ):
+        [edge_pieces, middle_pieces, corner_pieces] = self.sort_puzzle()
+
         # sort puzzle into edge, middle, and corner pieces
 
         # starting with a corner, complete the edges
