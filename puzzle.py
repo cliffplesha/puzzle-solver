@@ -1,6 +1,7 @@
 
 import copy
 import random
+import itertools
 from typing_extensions import Literal
 
 import numpy as np
@@ -16,138 +17,28 @@ class Piece:
     def __init__(
         self,
         piece_type: PIECE_TYPE,
-        connection_pts: int,
+        node_location: tuple,
         unconnected_edges: int,
-        connection_map: dict(str, int) | None = None,
-        corner_connections: int | None = None,
-        middle_connections: int | None = None,
-        edge_connections: int | None = None,
-        connected_edges: int = 0,
         area: SUB_AREA | None = None
     ):
         self.piece_type = piece_type
-        if connection_map is None:
-            self.connection_map = {}
-        else: self.connection_map = connection_map
-        self.connection_map['connection_pts'] = connection_pts
-        self.connection_map['unconnected_edges'] = unconnected_edges
-        self.connection_map['connected_edges'] = connected_edges
-        self.connection_map['corner_connections'] = corner_connections
-        self.connection_map['middle_connections'] = middle_connections
-        self.connection_map['edge_connections'] = edge_connections
         self.area = area
+        self.node_location = node_location
+        self.connected_edges = 0
+        self.unconnected_edges = unconnected_edges
     
-    def test_connection(
-        self,
-        test_piece: Piece,
-        puzzle: Puzzle
-    ) -> bool:
-        """
-        test if puzzle pieces fit together
-        returns true if pieces fit and decrements available slots for pieces.
-        """
-        # check if pieces can fit
-        connection_types_remaining = test_piece.connection_map[test_piece.piece_type +'_connections']
-            
-        if connection_types_remaining == 0:
-            # no available connection slots for piece remaining
-            return False
-        piece_a_unconnected_edges = self.connection_map['unconnected_edges']
-        piece_b_unconnected_edges = test_piece.connection_map['unconnected_edges']
-        connection_prob = min(piece_a_unconnected_edges, piece_b_unconnected_edges)/(puzzle.piece_test_pool.size)
-        if piece_a_unconnected_edges < piece_b_unconnected_edges: 
-            puzzle.solution_time += random.randint(piece_a_unconnected_edges, piece_b_unconnected_edges)
-        else:
-            puzzle.solution_time += random.randint(piece_b_unconnected_edges, piece_a_unconnected_edges)
-        if random.random() <= connection_prob:
-            self.connection_map['connected_edges'] +=1
-            self.connection_map['unconnected_edges'] -= 1
-            test_piece.connection_map['connected_edges'] += 1
-            test_piece.connection_map['unconnected_edges'] -= 1
-            self.connection_map[test_piece.piece_type+'_connections'] -= 1
-            test_piece.connection_map[self.piece_type+'_connections'] -= 1
-            return True
-        else:
-            return False
-    
-        
 
-class EdgePiece(Piece):
-    """
-    class for edge pieces
-    """
-    def __init__(
-        self,
-        edge_connections: int,
-        middle_connections: int,
-        corner_connections: int
-    ):
-        self.connection_map:{str,int}
-        super().__init__(
-            piece_type='edge',
-            connection_pts=3,
-            unconnected_edges=3,
-            edge_connections=edge_connections,
-            middle_connections=middle_connections,
-            corner_connections=corner_connections,
-            connection_map={}
-            )
-
-
-
-class MiddlePiece(Piece):
-    """
-    class for middle pieces
-    """
-    def __init__(
-        self,
-        edge_connections: int,
-        middle_connections: int,
-        corner_connections: int = 0
-    ):
-        self.connection_map:{str,int}
-        super().__init__(
-            piece_type='middle', 
-            connection_pts=4, 
-            unconnected_edges=4,
-            edge_connections=edge_connections,
-            middle_connections=middle_connections,
-            corner_connections=corner_connections,
-            connection_map={}
-            )
-
-class CornerPiece(Piece):
-    def __init__(
-        self,
-        edge_connections: int,
-        middle_connections: int,
-        corner_connections: int
-    ):
-        self.connection_map:{str,int}
-        super().__init__(
-            piece_type='corner', 
-            connection_pts=2, 
-            unconnected_edges=2,
-            edge_connections=edge_connections,
-            middle_connections=middle_connections,
-            corner_connections=corner_connections
-            )
 
 class Puzzle:
     def __init__(
         self,
-        length: int = 40,
-        height: int = 25,
-        corner_piece_count:int = 4,
+        m: int = 25,
+        n: int = 40,
     ):
-        self.length = length
-        self.height = height
-        self.total_piece_count = length * height
-        self.edge_pieces_count = (length-2)*2 + (height-2)*2
-        self.corner_piece_count = corner_piece_count
-        self.middle_pieces_count = self.total_piece_count - self.edge_pieces_count - self.corner_piece_count
+        self.rows = m
+        self.columns = n
         self.solution_time = 0
-        self.all_puzzle_pieces = np.array([])
+        self.all_puzzle_pieces:np.ndarray[Piece] = np.array([])
         self.unconnected_pieces = np.array([])
         self.fully_connected_pieces = np.array([])
         self.partially_connected_pieces = np.array([])
@@ -155,59 +46,47 @@ class Puzzle:
         
     def create_puzzle(self):
         full_puzzle = np.array([])
-        # create corner piece. Can only connect to edge pieces
-        for i in range(self.corner_piece_count):
-            full_puzzle = np.append(
-                full_puzzle, 
-                CornerPiece(edge_connections=2, middle_connections=0, corner_connections=0)
-            )
-        # create edge pieces
-        # edge pieces not connected to corner pieces
-        for i in range(self.edge_pieces_count-self.corner_piece_count*2):
-            full_puzzle = np.append(
-                full_puzzle, 
-                EdgePiece(
-                    edge_connections=2,
-                    middle_connections=1,
-                    corner_connections=0
-                    )
-                )
-        # edge pieces connected to corner pieces
-        for i in range(self.corner_piece_count*2):
-            full_puzzle = np.append(
-                full_puzzle, 
-                EdgePiece(
-                    edge_connections=1,
-                    middle_connections=1,
-                    corner_connections=1
-                    )
-                )
-        # create middle pieces
-        # middle pieces that connect to edge pieces
-        for i in range(self.edge_pieces_count):
-            full_puzzle = np.append(
-                full_puzzle, 
-                MiddlePiece(
-                    corner_connections=0,
-                    edge_connections=1,
-                    middle_connections=3
-                )
-            )
-        # middle pieces that only connect to middle pieces
-        for i in range (self.middle_pieces_count-self.edge_pieces_count):
-            full_puzzle = np.append(
-                full_puzzle,
-                MiddlePiece(
-                    edge_connections=0,
-                    corner_connections=0,
-                    middle_connections=4
-                )
-            )
+        self.solution_time = 0
+        G:nx.graph.Graph = nx.grid_2d_graph(self.rows,self.columns)
+        self.puzzle_structure = G
+        for node in G.nodes:
+            if node[1]<20 and node[0]<13:
+                area='top_left'
+            elif node[1]>= 20 and node[0]<13:
+                area = 'top_right'
+            elif node[1]< 20 and node[0]>=13:
+                area = 'bottom_left'
+            elif node[1]>= 20 and node[0]>=13:
+                area = 'bottom_right'
 
+            match G.degree(node):
+                case 2:
+                    piece = Piece(
+                        piece_type='corner',
+                        node_location=node,
+                        unconnected_edges=2,
+                        area=area
+                    )
+                case 3:
+                    piece = Piece(
+                        piece_type='edge',
+                        node_location=node,
+                        unconnected_edges=3,
+                        area=area
+                    )
+                case 4:
+                   piece = Piece(
+                        piece_type='middle',
+                        node_location=node,
+                        unconnected_edges=4,
+                        area=area
+                    )
+            full_puzzle = np.append(full_puzzle, piece)
         self.all_puzzle_pieces = full_puzzle
-        self.unconnected_pieces = copy.deepcopy(full_puzzle)
+        self.unconnected_pieces = np.array([])
         self.fully_connected_pieces = np.array([])
         self.partially_connected_pieces = np.array([])
+
     
     def pickup_random_piece(
         self,
@@ -222,81 +101,109 @@ class Puzzle:
         self.solution_time += 2
         return piece_a
 
-    def sort_puzzle(
+    def test_for_connection(
+        self,
+        piece_a:Piece,
+        piece_b:Piece
+    ) -> bool:
+        
+        if piece_b.node_location in list(self.puzzle_structure.adj[piece_a.node_location]):
+            self.solution_time += random.randint(1,int(piece_a.unconnected_edges*piece_b.unconnected_edges/2))
+            piece_a.unconnected_edges -= 1
+            piece_b.unconnected_edges -= 1
+            piece_a.connected_edges += 1
+            piece_b.connected_edges += 1
+            return True
+        else:
+            self.solution_time += piece_a.unconnected_edges*piece_b.unconnected_edges/2
+            return False
+
+
+    def sort_back_of_puzzle(
         self
-    )->list[np.array, np.array, np.array]:
+    )->list[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Method to simulated sorting all pieces
         Returns arrays of sorted pieces
         """
-        edge_pieces = np.array([])
-        middle_pieces =  np.array([])
-        corner_pieces = np.array([])
+        top_left_pieces = np.array([])
+        top_right_pieces = np.array([])
+        bottom_left_pieces = np.array([])
+        bottom_right_pieces = np.array([])
 
-        i = 0
-
-        while i < self.all_puzzle_pieces.size:
-            piece_a = self.pickup_random_piece(self)
-            if piece_a.piece_type == 'edge':
-                edge_pieces = np.append(edge_pieces, piece_a)
-            elif piece_a.piece_type == 'corner':
-                corner_pieces = np.append(corner_pieces, piece_a)
-            elif piece_a.piece_type == 'middle':
-                middle_pieces = np.append(middle_pieces, piece_a)
-            i += 1
-        
-        return [edge_pieces, middle_pieces, corner_pieces]
-
-
+        for piece in self.all_puzzle_pieces:
+            piece: Piece
+            self.solution_time += 4 #estimated time to sort an individual piece
+            match piece.area:
+                case 'top_left':
+                    top_left_pieces = np.append(top_left_pieces,piece)
+                case 'top_right':
+                    top_right_pieces = np.append(top_right_pieces,piece)
+                case 'bottom_left':
+                    bottom_left_pieces = np.append(bottom_left_pieces,piece)
+                case 'bottom_right':
+                    bottom_right_pieces = np.append(bottom_right_pieces,piece)
+        return top_left_pieces, top_right_pieces, bottom_left_pieces, bottom_right_pieces
+                    
 
     def random_solve(
         self,
+        piece_pool:np.ndarray[Piece] | None = None
     ) -> float:
-        self.create_puzzle()
+        if piece_pool is None:
+            self.create_puzzle()
+            initial_piece_pool = self.all_puzzle_pieces
+        else:
+            initial_piece_pool = piece_pool
+        self.unconnected_pieces = initial_piece_pool
+        
         while self.unconnected_pieces.size > 2:
             piece_a = self.pickup_random_piece()
             self.unconnected_pieces = np.delete(self.unconnected_pieces, np.where(self.unconnected_pieces == piece_a)[0]) #remove grabbed piece from pool
             self.piece_test_pool = copy.deepcopy(self.unconnected_pieces) # create pool of pieces to test piece_a against
-            while piece_a.connection_map['unconnected_edges'] > 0: #while that piece is not fully connected 
+            while piece_a.unconnected_edges > 0: #while that piece is not fully connected
                 try:
                     piece_b:Piece = self.pickup_random_piece(piece_pool=self.piece_test_pool) #grab new random piece from pool
-                    connection_result = piece_a.test_connection(piece_b, self) #test if pieces connect
-                    self.piece_test_pool = np.delete(self.piece_test_pool, np.where(self.piece_test_pool == piece_b)[0]) 
-                    if connection_result:
-                        if piece_b.connection_map['unconnected_edges']==0:
-                            self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_b)
-                            self.unconnected_pieces = np.delete(
-                                self.unconnected_pieces, 
-                                np.where(self.unconnected_pieces == piece_b)[0]
-                            )
-                except ZeroDivisionError, ValueError:
-                    self.solution_time += 1
+                except ValueError:
+                    # no further pieces to test. Must be edge for not full puzzle
                     break
+                connection_result = self.test_for_connection(piece_a=piece_a, piece_b=piece_b)
+                self.piece_test_pool = np.delete(self.piece_test_pool, np.where(self.piece_test_pool == piece_b)[0]) 
+                if connection_result:
+                    if piece_b.unconnected_edges==0:
+                        self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_b)
+                        self.unconnected_pieces = np.delete(
+                            self.unconnected_pieces, 
+                            np.where(self.unconnected_pieces == piece_b)[0]
+                         )
+                # except ZeroDivisionError, ValueError:
+                #     self.solution_time += 1
+                #     break
             self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_a)
             self.unconnected_pieces = np.delete(self.unconnected_pieces, np.where(self.unconnected_pieces == piece_a)[0])
         #all but one piece is left. Connect and finish puzzle
         return self.solution_time
         
-    def solve_edges(
-        self,
-        edge_pieces: np.ndarray[EdgePiece],
-        corner_pieces: np.ndarray[CornerPiece]
-    ):
-        return 0
+    # def solve_edges(
+    #     self,
+    #     edge_pieces: np.ndarray[EdgePiece],
+    #     corner_pieces: np.ndarray[CornerPiece]
+    # ):
+    #     return 0
 
-    def edge_in_solve(
-        self,
-    ):
-        [edge_pieces, middle_pieces, corner_pieces] = self.sort_puzzle()
+    # def edge_in_solve(
+    #     self,
+    # ):
+    #     [edge_pieces, middle_pieces, corner_pieces] = self.sort_puzzle()
 
-        # sort puzzle into edge, middle, and corner pieces
+    #     # sort puzzle into edge, middle, and corner pieces
 
-        # starting with a corner, complete the edges
+    #     # starting with a corner, complete the edges
 
-        # get random middle piece, and see if connects to any of the edge pieces or partially connected pieces
+    #     # get random middle piece, and see if connects to any of the edge pieces or partially connected pieces
         
 
-        return 0
+    #     return 0
 
 
         
