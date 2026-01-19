@@ -108,7 +108,11 @@ class Puzzle:
     ) -> bool:
         
         if piece_b.node_location in list(self.puzzle_structure.adj[piece_a.node_location]):
-            self.solution_time += random.randint(1,int(piece_a.unconnected_edges*piece_b.unconnected_edges/2))
+            try:
+                self.solution_time += random.randint(1,int(piece_a.unconnected_edges*piece_b.unconnected_edges/2))
+            except ValueError:
+                # an unconnected edge is 0
+                self.solution_time += 1
             piece_a.unconnected_edges -= 1
             piece_b.unconnected_edges -= 1
             piece_a.connected_edges += 1
@@ -145,6 +149,25 @@ class Puzzle:
                     bottom_right_pieces = np.append(bottom_right_pieces,piece)
         return top_left_pieces, top_right_pieces, bottom_left_pieces, bottom_right_pieces
                     
+    def sort_shape_of_puzzle(
+        self
+    )->list[np.ndarray, np.ndarray, np.ndarray]:
+        edge_pieces = np.array([])
+        middle_pieces = np.array([])
+        corner_pieces = np.array([])
+        for piece in self.all_puzzle_pieces:
+            piece: Piece
+            self.solution_time += 4
+            match piece.piece_type:
+                case "middle":
+                    middle_pieces = np.append(middle_pieces, piece)
+                case "edge":
+                    edge_pieces = np.append(edge_pieces, piece)
+                case "corner":
+                    corner_pieces = np.append(corner_pieces, piece)
+        
+        return middle_pieces, edge_pieces, corner_pieces
+        
 
     def random_solve(
         self,
@@ -184,11 +207,15 @@ class Puzzle:
         #all but one piece is left. Connect and finish puzzle
         return self.solution_time
         
-    # def solve_edges(
-    #     self,
-    #     edge_pieces: np.ndarray[EdgePiece],
-    #     corner_pieces: np.ndarray[CornerPiece]
-    # ):
+    def solve_edges(
+        self,
+        edge_pieces: np.ndarray[Piece],
+        corner_pieces: np.ndarray[Piece]
+    ):
+        piece_pool = np.concat([edge_pieces, corner_pieces])
+        self.random_solve(piece_pool=piece_pool)
+            
+        
     #     return 0
 
     # def edge_in_solve(
