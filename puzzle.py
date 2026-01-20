@@ -152,6 +152,12 @@ class Puzzle:
     def sort_shape_of_puzzle(
         self
     )->list[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Sorts the puzzle into edge, middle, and corner pieces
+
+        Returns:
+            list[middle_pieces, edge_pieces, corner_pieces]
+        """
         edge_pieces = np.array([])
         middle_pieces = np.array([])
         corner_pieces = np.array([])
@@ -175,10 +181,9 @@ class Puzzle:
     ) -> float:
         if piece_pool is None:
             self.create_puzzle()
-            initial_piece_pool = self.all_puzzle_pieces
+            self.unconnected_pieces = self.all_puzzle_pieces
         else:
-            initial_piece_pool = piece_pool
-        self.unconnected_pieces = initial_piece_pool
+            self.unconnected_pieces = copy.deepcopy(piece_pool)
         
         while self.unconnected_pieces.size > 2:
             piece_a = self.pickup_random_piece()
@@ -189,21 +194,27 @@ class Puzzle:
                     piece_b:Piece = self.pickup_random_piece(piece_pool=self.piece_test_pool) #grab new random piece from pool
                 except ValueError:
                     # no further pieces to test. Must be edge for not full puzzle
+                    if piece_a not in self.partially_connected_pieces:
+                        self.partially_connected_pieces = np.append(self.partially_connected_pieces, piece_a)
                     break
                 connection_result = self.test_for_connection(piece_a=piece_a, piece_b=piece_b)
                 self.piece_test_pool = np.delete(self.piece_test_pool, np.where(self.piece_test_pool == piece_b)[0]) 
                 if connection_result:
-                    if piece_b.unconnected_edges==0:
-                        self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_b)
-                        self.unconnected_pieces = np.delete(
+                    self.unconnected_pieces = np.delete(
                             self.unconnected_pieces, 
                             np.where(self.unconnected_pieces == piece_b)[0]
                          )
-                # except ZeroDivisionError, ValueError:
-                #     self.solution_time += 1
-                #     break
-            self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_a)
+                    if piece_b.unconnected_edges==0:
+                        self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_b)
+                    else:
+                        if piece_b not in self.partially_connected_pieces:
+                            self.partially_connected_pieces = np.append(self.partially_connected_pieces, piece_b)                 
             self.unconnected_pieces = np.delete(self.unconnected_pieces, np.where(self.unconnected_pieces == piece_a)[0])
+            if piece_a.unconnected_edges == 0:
+                if piece_a in self.partially_connected_pieces:
+                    self.partially_connected_pieces = np.delete(self.partially_connected_pieces, np.where(self.partially_connected_pieces == piece_a)[0])
+                self.fully_connected_pieces = np.append(self.fully_connected_pieces, piece_a)
+
         #all but one piece is left. Connect and finish puzzle
         return self.solution_time
         
